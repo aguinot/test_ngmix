@@ -1,3 +1,6 @@
+import sys
+import argparse
+
 import numpy as np
 from numpy.random import uniform as urand
 
@@ -7,9 +10,6 @@ import ngmix
 
 from joblib import Parallel, delayed
 from tqdm import tqdm
-
-
-# np.random.seed(1234)
 
 
 
@@ -413,12 +413,12 @@ class Shapes():
 
         if self._make_galsim:
             bad_flags = np.where(self.final['galsim']['gal'][:,0] != -10)[0]
-            err = (self.final['galsim']['gal'][bad_flags] - self._true_g.squeeze())/1e-3
+            err = (self.final['galsim']['gal'][bad_flags] - self._true_g.squeeze()[bad_flags])/1e-3
             print()
             print('Galsim error')
             print('------------')
             print("Galaxy rejected because of errors : {}".format(len(self.final['galsim']['gal'][:,0]) - len(self.final['galsim']['gal'][:,0][bad_flags])))
-            print('e1 = {}      e2 = {}    10^-3'.format(*np.mean(err[bad_flags], 0)))
+            print('e1 = {}      e2 = {}    10^-3'.format(*np.mean(err, 0)))
 
         if self._make_galsim_mcal:
             bad_flags = self.final['galsim_mcal']['noshear'][:,0] != -10
@@ -436,7 +436,7 @@ class Shapes():
             print('Galsim + Metacal error')
             print('----------------------')
             print("Galaxy rejected because of errors : {}".format(len(g1) - len(g1[bad_flags])))
-            print('e1 = {}      e2 = {}    10^-3'.format(*np.mean(err[bad_flags], 0)))
+            print('e1 = {}      e2 = {}    10^-3'.format(*np.mean(err, 0)))
             print("m [1e-3] : {m:f} +/- {msd:f}\nc [1e-4] : {c:f} +/- {csd:f}\nm : {m2:f} +/- {msd2:f}\nc : {c2:f} +/- {csd2:f}".format(
                         m=m/1e-3,
                         msd=merr/1e-3,
@@ -459,12 +459,12 @@ class Shapes():
 
             m, merr, c, cerr = self._jack_est(g1[bad_flags], R11[bad_flags] * self._true_g[:,0], g2[bad_flags], R22[bad_flags])
             
-            err = (np.array([g1, g2]).T/np.mean([R11, R22], 1) - self._true_g.squeeze())/1e-3
+            err = (np.array([g1[bad_flags], g2[bad_flags]]).T/np.mean([R11[bad_flags], R22[bad_flags]], 1) - self._true_g.squeeze()[bad_flags])/1e-3
             print()
             print('Ngmix error')
             print('-----------')
             print("Galaxy rejected because of errors : {}".format(len(g1) - len(g1[bad_flags])))
-            print('e1 = {}      e2 = {}    10^-3'.format(*np.mean(err[bad_flags], 0)))
+            print('e1 = {}      e2 = {}    10^-3'.format(*np.mean(err, 0)))
             print("m [1e-3] : {m:f} +/- {msd:f}\nc [1e-4] : {c:f} +/- {csd:f}\nm : {m2:f} +/- {msd2:f}\nc : {c2:f} +/- {csd2:f}".format(
                         m=m/1e-3,
                         msd=merr/1e-3,
@@ -506,9 +506,25 @@ class Shapes():
         return m, m_err, c, c_err
 
 
-cgal = Sersic()
-r = cgal.get_gal(n_gal=5000, snr=30, img_pixel_scale=0.2, img_shape=(101, 101))
+if __name__ == '__main__':
 
-obs_shape = Shapes(r[0], r[1], r[2], pixel_scale=0.2)
-obs_shape.get_shapes()
-obs_shape.get_err_shapes()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-n', '--n_gal', dest='n', default=100, type=int, help='Number of galaxies to simulate. Default : 100')
+    parser.add_argument('-snr', '--snr', dest='snr', default=30, type=int, help='SNR of the galaxies. Default : 30')
+    parser.add_argument('-ps', '--pixel_scale', dest='PS', default=0.2, type=float, help='Pixel scale. Default : 0.2')
+    parser.add_argument('-galsim', '--galsim', dest='m_gal', default=True, type=bool, help='Run Galsim for the shape measurment (re-gauss). Default : True')
+    parser.add_argument('-galism_mcal', '--galsim_metacal', dest='m_gal_mcal', default=True, type=bool, help='Run Galsim + Metacalibration. Default : True')
+    parser.add_argument('-ngmix', '--ngmix', dest='m_ngmix', default=True, type=bool, help='Run Ngmix for the shape measurment. Default : True')
+
+    res = parser.parse_args()
+
+    # Create the simulation
+    cgal = Sersic()
+    r = cgal.get_gal(n_gal=res.n, snr=res.snr, img_pixel_scale=res.PS, img_shape=(101, 101))
+
+    # Run the shape measurement 
+    obs_shape = Shapes(r[0], r[1], r[2], pixel_scale=0.2, make_galsim=res.m_gal, make_galsim_mcal=res.m_gal_mcal, make_ngmix=res.m_ngmix)
+
+    obs_shape.get_shapes()
+    obs_shape.get_err_shapes()
