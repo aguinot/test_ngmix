@@ -148,7 +148,7 @@ class Shapes():
 
         np.random.seed(seed)
 
-        obs = self._get_ngmix_obs(gal_img, psf_img)
+        obs = self._get_ngmix_obs(gal_img, psf_img, fit_psf=False)
 
         res = self._run_metacal(obs)
 
@@ -267,7 +267,7 @@ class Shapes():
         return output
 
 
-    def _get_ngmix_obs(self, gal_img, psf_img, psf_pars=[0.0, 0.0, -0.01, 0.01, 0.15, 1.0]):
+    def _get_ngmix_obs(self, gal_img, psf_img, psf_pars=[0.0, 0.0, -0.01, 0.01, 0.15, 1.0], fit_psf=True):
         """
         """
 
@@ -287,23 +287,24 @@ class Shapes():
         psf_weight = np.ones_like(psf_img) / psf_noise**2
         psf_obs=ngmix.Observation(psf_img, weight=psf_weight, jacobian=psf_jacob)
 
-        pfitter=ngmix.fitting.LMSimple(psf_obs,'gauss',lm_pars=lm_pars)
+        if fit_psf:
+            pfitter=ngmix.fitting.LMSimple(psf_obs,'gauss',lm_pars=lm_pars)
 
-        guess=np.array(psf_pars)
-        guess[0] += urand(low=-eps,high=eps)
-        guess[1] += urand(low=-eps,high=eps)
-        guess[2] += urand(low=-eps, high=eps)
-        guess[3] += urand(low=-eps, high=eps)
-        guess[4] *= (1.0 + urand(low=-eps, high=eps))
-        guess[5] *= (1.0 + urand(low=-eps, high=eps))
+            guess=np.array(psf_pars)
+            guess[0] += urand(low=-eps,high=eps)
+            guess[1] += urand(low=-eps,high=eps)
+            guess[2] += urand(low=-eps, high=eps)
+            guess[3] += urand(low=-eps, high=eps)
+            guess[4] *= (1.0 + urand(low=-eps, high=eps))
+            guess[5] *= (1.0 + urand(low=-eps, high=eps))
 
-        pfitter.go(guess)
+            pfitter.go(guess)
 
-        # print(np.abs((pfitter.get_result()['g']-np.array([-0.01, 0.01]))/np.array([-0.01, 0.01])))
+            # print(np.abs((pfitter.get_result()['g']-np.array([-0.01, 0.01]))/np.array([-0.01, 0.01])))
 
-        psf_gmix_fit = pfitter.get_gmix()
+            psf_gmix_fit = pfitter.get_gmix()
 
-        psf_obs.set_gmix(psf_gmix_fit)
+            psf_obs.set_gmix(psf_gmix_fit)
 
         # Gal fitting
         # Get noise level direclty from the image
